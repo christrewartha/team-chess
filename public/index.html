@@ -21,6 +21,9 @@ button.danger { border-color: var(--danger); color: var(--danger); }
 input, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 h1, h2, h3 { margin: 0 0 8px; }
 .hidden { display: none !important; }
+.helplink { color: var(--accent); font-weight: 600; }
+.btnlink { display: inline-block; text-decoration: none; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; }
+.btnlink:hover { border-color: var(--accent); }
 .dim { color: var(--dim); }
 .pill { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 12px; background: var(--panel2); border: 1px solid var(--line); }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: hsl(var(--h) 70% 55%); margin-right: 6px; }
@@ -121,6 +124,7 @@ table.st td, table.st th { text-align: left; padding: 3px 6px; border-bottom: 1p
 <section id="home" class="hidden">
   <div class="tag">16<small>v</small>16 <small>Chess</small></div>
   <div class="dim">One piece per player. First legal move on your team's turn is the team's move.</div>
+  <div style="margin-top:8px"><a class="helplink" href="/rules.html" target="_blank" rel="noopener">How to play &rarr;</a></div>
   <div class="card">
     <label>Your name<br><input id="name" maxlength="16" placeholder="Ray" style="width:100%"></label>
   </div>
@@ -248,6 +252,7 @@ function renderLobby() {
         <label>+ sec <input type="number" id="setInc" min="0" max="30" step="1" value="${S.settings.increment}" ${host ? '' : 'disabled'}></label>
       </div>
       <div class="actions">
+        <a class="helplink btnlink" href="/rules.html" target="_blank" rel="noopener">How to play</a>
         <button class="danger" id="leaveBtn">Leave room</button>
         <button id="copyLink">Copy invite link</button>
         <button id="shuffle" ${host ? '' : 'disabled'}>Shuffle everyone into seats</button>

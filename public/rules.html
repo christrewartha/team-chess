@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to play: 16v16 Chess</title>
+<style>
+:root { --bg: #12141a; --panel: #1b1e27; --line: #2f3445; --text: #e8eaf0; --dim: #8b92a6; --accent: #ffb020; --danger: #ff5c5c; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 20px 18px 60px; }
+a { color: var(--accent); }
+.tag { font-size: 34px; font-weight: 800; letter-spacing: -1px; }
+.tag small { color: var(--accent); }
+h2 { margin: 30px 0 8px; font-size: 21px; }
+p, ul, ol { margin: 8px 0; }
+li { margin: 4px 0; }
+.lead { font-size: 18px; color: var(--text); }
+.dim { color: var(--dim); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+.card.hot { border-color: var(--accent); }
+table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--dim); font-weight: 600; }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+.back { display: inline-block; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="/" onclick="return backToGame()">&larr; Back to the game</a>
+<div class="tag">16<small>v</small>16 <small>Chess</small>: how to play</div>
+<p class="lead">It's chess, played by a team. Every piece belongs to a person, you can only move your own, and whoever moves first on your team's turn makes the move for everyone.</p>
+<p class="dim">Ordinary chess rules apply to anything not covered here.</p>
+
+<div class="card hot">
+  <b>The short version</b>
+  <ol>
+    <li>When it's your team's turn, anyone on the team can move one of their own pieces.</li>
+    <li>The first legal move to reach the server is the team's move. Everyone else is too late.</li>
+    <li>There are no take-backs, and every move has the mover's name on it.</li>
+  </ol>
+</div>
+
+<h2>Your pieces</h2>
+<p>Each piece has a coloured disc and a name tag showing who owns it. Yours have a brighter tag with a white outline. You can't touch anyone else's pieces, including your teammates'.</p>
+<p>How many pieces you get depends on the room:</p>
+<table>
+  <tr><th>Game</th><th>Players per side</th><th>You control</th></tr>
+  <tr><td>2 v 2</td><td>2</td><td>Half the board: the queenside (a to d files) or the kingside (e to h files)</td></tr>
+  <tr><td>4 v 4</td><td>4</td><td>Two neighbouring pieces plus the two pawns in front of them</td></tr>
+  <tr><td>16 v 16</td><td>16</td><td>One piece</td></tr>
+</table>
+<p>If a side has fewer players than seats, the pieces from empty seats are shared out among the players who are there. Two people can play any size of game.</p>
+<p>Your pieces stay yours all game. A pawn you promote is still yours.</p>
+
+<h2>Making a move</h2>
+<ul>
+  <li><b>Drag</b> a piece to a square, or <b>tap</b> the piece and then tap the square.</li>
+  <li>Dots show where the piece can go. A ring means a capture.</li>
+  <li>To change your mind before letting go, press <b>Esc</b> or drop the piece back where it started. Once you let go on a legal square, the move is sent.</li>
+  <li>Your pieces turn faded when they have no legal moves.</li>
+</ul>
+<p>As soon as a move lands, the mover's name flashes across the board for everyone, and it goes into the move list, for example "Ray: Bc4". If a teammate beat you to it, your move is thrown away. Those near-misses are counted, and you'll see them at the end.</p>
+
+<h2>Check</h2>
+<p>When your king is in check, only pieces that can get it out of check can move. They're outlined in <span class="swatch" style="background:var(--accent)"></span>orange, and the status bar names their owners. Everyone else is locked out and can only watch.</p>
+<p>Sometimes the whole team is relying on one person. The clock keeps running.</p>
+<p>Checkmate loses the game. If your side has no legal move and isn't in check, it's stalemate, which is a draw.</p>
+
+<h2>Special moves</h2>
+<ul>
+  <li><b>Castling</b> is a king move, so the king's owner decides. The rook goes along and its owner gets credited as an accomplice in the move list.</li>
+  <li><b>En passant</b> belongs to the pawn making the capture.</li>
+  <li><b>Promotion:</b> when your pawn reaches the far end, you get 5 seconds to pick a queen, rook, bishop or knight. The team clock keeps running. If you don't pick, you get a queen.</li>
+</ul>
+
+<h2>The clock</h2>
+<p>Each side's time runs while it's their turn. The default is 3 minutes per side, plus 2 seconds added after each move. The host can change both in the lobby.</p>
+<p>If your clock runs out you lose, unless the other side doesn't have enough pieces left to checkmate, in which case it's a draw.</p>
+
+<h2>The king's player</h2>
+<p>Whoever owns the king (👑 in the player list) holds the <b>Resign</b> and <b>Offer draw</b> buttons for the whole team, and answers the other side's draw offers. Everyone else gets <b>Call for resign</b> and <b>Call for draw</b>, which ask the king's player in team chat.</p>
+
+<h2>Losing all your pieces</h2>
+<p>If your last piece is captured you become a ghost 👻. You stay on the team and can still chat, but you can't move. There's no coming back.</p>
+
+<h2>Chat</h2>
+<p>In the lobby everyone shares one chat. Once the game starts, each team has its own chat that the other side can't see. Spectators can watch but can't post during a game.</p>
+<p>Talking out loud or on a voice call is fine. Shouting at whoever just moved is part of the game.</p>
+
+<h2>Setting up a game</h2>
+<ol>
+  <li>Enter your name and press <b>Create room</b>. Pick the size first.</li>
+  <li>Share the 4-letter room code, or press <b>Copy invite link</b>.</li>
+  <li>Everyone clicks a seat on White or Black. Unseated players watch. The host can press <b>Shuffle</b> to deal everyone into random seats.</li>
+  <li>The host sets the clock and presses <b>Start game</b>. Each side needs at least one player.</li>
+</ol>
+<p>After a game the host can take everyone back to the lobby for another one.</p>
+
+<h2>If you get disconnected</h2>
+<p>The page reconnects by itself, and refreshing puts you back in your seat. <b>Don't close the tab during a game.</b> A new tab counts as a new player, who can't get back to the old pieces. While you're gone, your pieces stay put and nobody else can move them. After 15 seconds you show as 💤 away.</p>
+
+<p style="margin-top:30px"><a href="/" onclick="return backToGame()">&larr; Back to the game</a></p>
+<script>
+// opened in its own tab from the game: close it rather than starting a second copy of the game
+function backToGame() { if (history.length > 1) return true; window.close(); setTimeout(() => { location.href = "/"; }, 150); return false; }
+</script>
+</main>
+</body>
+</html>
