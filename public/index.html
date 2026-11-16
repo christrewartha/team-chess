@@ -191,6 +191,7 @@ function onMsg(m) {
   if (m.t === 'state') { S = m; recvPerf = performance.now(); cancelDrag(); saveSession({ room: S.room, name: ($('#name').value || (session && session.name) || 'Player') }); render(); }
   else if (m.t === 'joined') { history.replaceState(null, '', '?room=' + m.room); }
   else if (m.t === 'moved') onMoved(m);
+  else if (m.t === 'left') { session = null; S = null; try { sessionStorage.removeItem('c16'); } catch (e) { /* ignore */ } history.replaceState(null, '', '/'); $('#code').value = ''; render(); }
   else if (m.t === 'error') { toast(m.msg); if (m.fatal) { session = null; try { sessionStorage.removeItem('c16'); } catch (e) { /* ignore */ } S = null; render(); } }
 }
 
@@ -247,6 +248,7 @@ function renderLobby() {
         <label>+ sec <input type="number" id="setInc" min="0" max="30" step="1" value="${S.settings.increment}" ${host ? '' : 'disabled'}></label>
       </div>
       <div class="actions">
+        <button class="danger" id="leaveBtn">Leave room</button>
         <button id="copyLink">Copy invite link</button>
         <button id="shuffle" ${host ? '' : 'disabled'}>Shuffle everyone into seats</button>
         <button class="primary" id="start" ${host && ready ? '' : 'disabled'}>${host ? 'Start game' : 'Waiting for host'}</button>
@@ -260,6 +262,7 @@ function renderLobby() {
       <div class="box"><h3>Chat</h3><div id="chatlist"></div><form class="chatform" id="chatform"><input id="chatin" maxlength="200" autocomplete="off" placeholder="Say something..."><button>Send</button></form></div>
     </div>`;
   document.querySelectorAll('.seat').forEach((b) => (b.onclick = () => send({ t: 'seat', seatId: b.dataset.seat === (me.seatId || '') ? null : b.dataset.seat })));
+  $('#leaveBtn').onclick = () => send({ t: 'leave' });
   $('#shuffle').onclick = () => send({ t: 'shuffle' });
   $('#start').onclick = () => send({ t: 'start' });
   $('#copyLink').onclick = () => { const url = location.origin + '/?room=' + S.room; (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Link copied'), () => prompt('Invite link', url)); };

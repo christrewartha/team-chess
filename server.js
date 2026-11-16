@@ -197,6 +197,14 @@ function createApp() {
         }
         break;
       }
+      case 'leave': {
+        if (room.phase === 'playing') return err('You cannot leave during a game');
+        removePlayer(room, p);
+        ws.pid = null; ws.room = null;
+        send(ws, { t: 'left' });
+        if (!room.players.size) { rooms.delete(room.code); return; }
+        break;
+      }
       case 'shuffle':
         if (room.phase !== 'lobby' || p.id !== room.hostId) return err('Only the host can shuffle in the lobby');
         shuffle(room);
@@ -264,6 +272,16 @@ function createApp() {
     let url, rel;
     try { url = new URL(req.url, 'http://x'); rel = decodeURIComponent(url.pathname); } catch (e) { res.writeHead(400); return res.end('Bad request'); }
     if (url.pathname === '/health') { res.writeHead(200); return res.end('ok'); }
+    if (url.pathname === '/status') {
+      // used by the deploy script so it doesn't restart in the middle of someone's game
+      const list = [...rooms.values()];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({
+        rooms: list.length,
+        playing: list.filter((r) => r.phase === 'playing').length,
+        connected: list.reduce((n, r) => n + [...r.players.values()].filter((q) => q.connected).length, 0),
+      }));
+    }
     if (rel === '/') rel = '/index.html';
     const file = path.join(PUBLIC_DIR, path.normalize(rel));
     if (!file.startsWith(PUBLIC_DIR + path.sep)) { res.writeHead(403); return res.end(); }

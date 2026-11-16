@@ -13,6 +13,23 @@ The server prints a `network:` address on startup. Open that on any device on yo
 
 To play from outside the house, put it behind a reverse proxy with TLS (Caddy: `caddy reverse-proxy --from chess.example.com --to localhost:3000`), or use a tunnel/VPN (Tailscale, Cloudflare Tunnel). The client switches to `wss://` automatically on HTTPS. WebSockets must be allowed through the proxy.
 
+## Deploying to the home server
+
+The server (`scaramanga`, user `chris`, Linux) runs the game as a systemd user service called `team-chess`, built from whatever is on GitHub `main`.
+
+Needs on the server: Node 18+, git, curl, and SSH access from your dev machine (ideally with a key, so you aren't typing a password every time).
+
+```
+git push
+deploy/deploy.sh             # clone or pull on the server, npm ci, restart, health check
+deploy/deploy.sh --force     # restart even if a game is in progress
+DEPLOY_HOST=chris@192.168.0.50 deploy/deploy.sh   # if the name doesn't resolve
+```
+
+The first run clones to `~/team-chess` and asks for your sudo password once, to enable lingering so the service runs without you logged in and starts at boot. The deploy refuses to restart while a game is being played, because rooms live in memory and a restart ends them.
+
+On the server: `systemctl --user status team-chess`, logs with `journalctl --user -u team-chess -f`. `/status` shows rooms, games in progress and connected players.
+
 ## Testing it alone
 
 Open two or more browser tabs (or a phone plus a laptop). Each tab is its own player, and refreshing a tab rejoins the same seat. In the lobby, put one player on each side and press Start. Empty seats' pieces are shared out among the players seated on that side, so 2 players can play any variant.

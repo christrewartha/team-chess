@@ -273,6 +273,14 @@ test('websocket game: lobby, seats, start, moves, attribution, chat, resign', as
     await b.until((c) => c.errors.length >= 2); // not the host
     a.send({ t: 'rematch' });
     await a.until((c) => c.state.phase === 'lobby');
+
+    // leaving the lobby frees the seat; the last one out closes the room
+    a.send({ t: 'leave' });
+    await b.until((c) => c.state.players.length === 1 && c.state.hostId === c.state.you);
+    assert(!b.state.seats.some((s) => s.playerId && s.playerId !== b.state.you));
+    b.send({ t: 'leave' });
+    await new Promise((r) => setTimeout(r, 100));
+    assert(!app.rooms.has(code));
   } catch (e) {
     app.close();
     throw e;
