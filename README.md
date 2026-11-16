@@ -21,6 +21,8 @@ Needs on the server: Node 18+, git, curl, and SSH access from your dev machine (
 
 ```
 git push
+npm run deploy               # same as deploy/deploy.sh; works from PowerShell via Git Bash
+npm run deploy -- --force
 deploy/deploy.sh             # clone or pull on the server, npm ci, restart, health check
 deploy/deploy.sh --force     # restart even if a game is in progress
 DEPLOY_HOST=chris@192.168.0.97 deploy/deploy.sh   # if scaramanga.local doesn't resolve
