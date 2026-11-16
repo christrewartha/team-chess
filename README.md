@@ -1,6 +1,6 @@
 # 16v16 Chess (prototype v0.1)
 
-Team chess where every player controls their own piece(s), and the first legal move on your team's turn is the team's move. Rules: see the "16v16 Chess: Ruleset v0.1" doc.
+Team chess where every player controls their own piece(s), and the first legal move on your team's turn is the team's move. Rules: see [16v16 Chess Ruleset.md](16v16%20Chess%20Ruleset.md) for the design, or [public/rules.html](public/rules.html) (the in-game "How to play" page) for the player version.
 
 ## Run it
 
@@ -13,22 +13,27 @@ The server prints a `network:` address on startup. Open that on any device on yo
 
 To play from outside the house, put it behind a reverse proxy with TLS (Caddy: `caddy reverse-proxy --from chess.example.com --to localhost:3000`), or use a tunnel/VPN (Tailscale, Cloudflare Tunnel). The client switches to `wss://` automatically on HTTPS. WebSockets must be allowed through the proxy.
 
-## Deploying to the home server
+## Deploying to a Linux server
 
-The server (`scaramanga`, user `chris`, Linux) runs the game as a systemd user service called `team-chess`, built from whatever is on GitHub `main`.
+The deploy script installs the game on a Linux machine you can SSH into and runs it as a systemd user service called `team-chess`. The server pulls the code from your GitHub repo, so it deploys whatever is pushed to `main`.
 
 Needs on the server: Node 18+, git, curl, and SSH access from your dev machine (ideally with a key, so you aren't typing a password every time).
 
+Tell the script where the server is, once, in `deploy/config.local` (it's gitignored):
+
 ```
-git push
-npm run deploy               # same as deploy/deploy.sh; works from PowerShell via Git Bash
-npm run deploy -- --force
-deploy/deploy.sh             # clone or pull on the server, npm ci, restart, health check
-deploy/deploy.sh --force     # restart even if a game is in progress
-DEPLOY_HOST=chris@192.168.0.97 deploy/deploy.sh   # if scaramanga.local doesn't resolve
+DEPLOY_HOST=you@yourserver.local
 ```
 
-The script uses `scaramanga.local` (mDNS), not plain `scaramanga`: on the work PC the bare name gets the `epicgames.net` suffix and reaches a different machine.
+Then:
+
+```
+git push
+npm run deploy               # clone or pull on the server, npm ci, restart, health check
+npm run deploy -- --force    # restart even if a game is in progress
+```
+
+`npm run deploy` runs `deploy/deploy.sh` and works from PowerShell; it finds Git Bash itself. You can also run `deploy/deploy.sh` directly from bash, or set `DEPLOY_HOST` in the environment instead of the config file. `TEAM_CHESS_PORT` changes the port (default 3000).
 
 The first run clones to `~/team-chess` and asks for your sudo password once, to enable lingering so the service runs without you logged in and starts at boot. The deploy refuses to restart while a game is being played, because rooms live in memory and a restart ends them.
 
