@@ -222,7 +222,8 @@ function render() {
 
 const pById = (id) => S.players.find((p) => p.id === id);
 const hueStyle = (p) => `--h:${p ? p.hue : 0}`;
-const nameSpan = (p) => `<span class="c" style="${hueStyle(p)}">${esc(p ? p.name : '?')}</span>`;
+const botMark = (p) => (p && p.isBot ? '🤖 ' : '');
+const nameSpan = (p) => `<span class="c" style="${hueStyle(p)}">${botMark(p)}${esc(p ? p.name : '?')}</span>`;
 function startGlyph(sq, side) { const t = sq[1] === '2' || sq[1] === '7' ? 'p' : BACKT[FILES.indexOf(sq[0])]; return `<span style="color:${side === 'w' ? '#fff' : '#111'};text-shadow:${side === 'w' ? '0 0 2px #000,0 0 2px #000' : '0 0 2px #fff,0 0 3px #fff'}">${GL[t]}${TXT}</span>`; }
 
 // ---------- lobby ----------
@@ -233,8 +234,9 @@ function renderLobby() {
     return `<div class="sidecol"><h3>${side === 'w' ? 'White' : 'Black'}</h3>` + seats.map((s) => {
       const occ = s.playerId ? pById(s.playerId) : null;
       const mine = s.playerId === S.you;
+      const locked = occ && !mine && !occ.isBot;
       const glyphs = s.squares.slice(0, 8).map((sq) => startGlyph(sq, side)).join('');
-      return `<button class="seat ${mine ? 'mine' : ''} ${occ && !mine ? 'taken' : ''}" data-seat="${s.id}" ${occ && !mine ? 'disabled' : ''}>
+      return `<button class="seat ${mine ? 'mine' : ''} ${locked ? 'taken' : ''}" data-seat="${s.id}" ${locked ? 'disabled' : ''} ${occ && occ.isBot ? 'title="Take this seat from the bot"' : ''}>
         <span class="g">${glyphs}</span><span>${esc(s.label)}</span>
         <span class="who">${occ ? nameSpan(occ) : '<span class="dim">sit here</span>'}</span></button>`;
     }).join('') + '</div>';
@@ -243,7 +245,7 @@ function renderLobby() {
   const unseated = S.players.filter((p) => !p.seatId);
   const seatedW = S.players.some((p) => p.side === 'w'), seatedB = S.players.some((p) => p.side === 'b');
   const ready = seatedW && seatedB;
-  const piecesNote = S.seats.some((s) => !s.playerId) ? '<div class="dim">Pieces of empty seats are shared out among the players seated on that side.</div>' : '';
+  const piecesNote = S.seats.some((s) => !s.playerId) ? '<div class="dim">Pieces of empty seats are shared out among the players seated on that side, or the host can fill them with bots.</div>' : '';
   $('#lobby').innerHTML = `
     <div class="lobbyhead">
       <div><div class="dim">Room code (${esc(VARIANTS[S.variant])})</div><div class="code">${esc(S.room)}</div></div>
@@ -256,19 +258,23 @@ function renderLobby() {
         <button class="danger" id="leaveBtn">Leave room</button>
         <button id="copyLink">Copy invite link</button>
         <button id="shuffle" ${host ? '' : 'disabled'}>Shuffle everyone into seats</button>
+        ${host ? `<button id="fillBots" ${S.seats.some((s) => !s.playerId) ? '' : 'disabled'}>Fill empty seats with bots</button>${S.players.some((p) => p.isBot) ? '<button id="clearBots">Remove bots</button>' : ''}` : ''}
         <button class="primary" id="start" ${host && ready ? '' : 'disabled'}>${host ? 'Start game' : 'Waiting for host'}</button>
       </div>
     </div>
     <div class="sides">${sideHtml('w')}${sideHtml('b')}</div>
     ${piecesNote}
     <div class="lobbybottom">
-      <div class="box"><h3>In the room</h3>${S.players.map((p) => `<div class="p"><span class="dot" style="${hueStyle(p)}"></span>${esc(p.name)}${p.id === S.hostId ? ' <span class="pill">host</span>' : ''}${p.id === S.you ? ' <span class="pill">you</span>' : ''}${!p.connected ? ' <span class="pill">offline</span>' : ''}${p.seatId ? '' : ' <span class="dim">(not seated)</span>'}</div>`).join('')}
+      <div class="box"><h3>In the room</h3>${S.players.filter((p) => !p.isBot).map((p) => `<div class="p"><span class="dot" style="${hueStyle(p)}"></span>${esc(p.name)}${p.id === S.hostId ? ' <span class="pill">host</span>' : ''}${p.id === S.you ? ' <span class="pill">you</span>' : ''}${!p.connected ? ' <span class="pill">offline</span>' : ''}${p.seatId ? '' : ' <span class="dim">(not seated)</span>'}</div>`).join('')}
+        ${S.players.some((p) => p.isBot) ? `<div class="dim" style="margin-top:6px">🤖 ${S.players.filter((p) => p.isBot).length} bots seated. Click a bot's seat to take it over.</div>` : ''}
         ${unseated.length && !me.seatId ? '<div class="dim" style="margin-top:6px">Pick a seat above to play. Unseated players spectate.</div>' : ''}</div>
       <div class="box"><h3>Chat</h3><div id="chatlist"></div><form class="chatform" id="chatform"><input id="chatin" maxlength="200" autocomplete="off" placeholder="Say something..."><button>Send</button></form></div>
     </div>`;
   document.querySelectorAll('.seat').forEach((b) => (b.onclick = () => send({ t: 'seat', seatId: b.dataset.seat === (me.seatId || '') ? null : b.dataset.seat })));
   $('#leaveBtn').onclick = () => send({ t: 'leave' });
   $('#shuffle').onclick = () => send({ t: 'shuffle' });
+  if ($('#fillBots')) $('#fillBots').onclick = () => send({ t: 'fillBots' });
+  if ($('#clearBots')) $('#clearBots').onclick = () => send({ t: 'clearBots' });
   $('#start').onclick = () => send({ t: 'start' });
   $('#copyLink').onclick = () => { const url = location.origin + '/?room=' + S.room; (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Link copied'), () => prompt('Invite link', url)); };
   const upd = () => send({ t: 'settings', minutes: $('#setMin').value, increment: $('#setInc').value });
@@ -374,7 +380,7 @@ function renderRoster() {
     const king = g.kingPlayer[side];
     return `<div class="rosterh">${side === 'w' ? 'White' : 'Black'}</div>` + ps.map((p) => {
       const ghost = p.pieces === 0;
-      return `<div class="p"><span class="dot" style="${hueStyle(p)}"></span><span class="n" ${ghost ? 'style="opacity:.55"' : ''}>${esc(p.name)}${p.id === S.you ? ' (you)' : ''}</span>${p.id === king ? '<span title="King">\u{1F451}</span>' : ''}${ghost ? '<span title="Ghost">\u{1F47B}</span>' : `<span class="pill">${p.pieces}</span>`}${p.absent ? '<span title="Absent">\u{1F4A4}</span>' : ''}</div>`;
+      return `<div class="p"><span class="dot" style="${hueStyle(p)}"></span><span class="n" ${ghost ? 'style="opacity:.55"' : ''}>${botMark(p)}${esc(p.name)}${p.id === S.you ? ' (you)' : ''}</span>${p.id === king ? '<span title="King">\u{1F451}</span>' : ''}${ghost ? '<span title="Ghost">\u{1F47B}</span>' : `<span class="pill">${p.pieces}</span>`}${p.absent ? '<span title="Absent">\u{1F4A4}</span>' : ''}</div>`;
     }).join('');
   };
   const spec = S.players.filter((p) => !p.side);
@@ -382,7 +388,7 @@ function renderRoster() {
 }
 
 function renderActions() {
-  const g = S.game; const el = $('#actions'); const me = g.youSide; const isKing = me && g.kingPlayer[me] === S.you;
+  const g = S.game; const el = $('#actions'); const me = g.youSide; const isKing = me && g.speaksForTeam;
   let h = `<button id="flipBtn">Flip board</button>`;
   if (S.phase === 'playing' && me) {
     if (isKing) h += `<button class="danger" id="resignBtn">Resign</button><button id="drawBtn" ${g.drawOffer === me ? 'disabled' : ''}>Offer draw</button>`;

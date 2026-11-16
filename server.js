@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { Game, buildSeats, VARIANTS } = require('./rules');
+const { chooseMove, BOT_NAMES } = require('./bot');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -13,9 +14,12 @@ const ABSENT_MS = 15000;
 const LOBBY_PRUNE_MS = 60000;
 const ROOM_IDLE_MS = 10 * 60000;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const BOT_DELAY_MS = [2000, 9000]; // each bot waits a random time in this range before trying its move
 
-function createApp() {
+function createApp(opts = {}) {
   const rooms = new Map();
+  const botDelay = opts.botDelayMs || BOT_DELAY_MS;
+  const humans = (room) => [...room.players.values()].filter((q) => !q.isBot);
 
   const send = (ws, obj) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); };
   const newId = () => crypto.randomBytes(6).toString('hex');
@@ -46,6 +50,18 @@ function createApp() {
     return p;
   }
 
+  function addBot(room, seat) {
+    const used = new Set([...room.players.values()].map((q) => q.name));
+    const name = BOT_NAMES.find((n) => !used.has(n)) || 'Bot ' + (room.players.size + 1);
+    const b = { id: 'bot-' + newId(), name, token: null, ws: null, connected: true, disconnectedAt: 0, seatId: seat.id, hue: hueFor(room), isBot: true };
+    room.players.set(b.id, b);
+    seat.playerId = b.id;
+    return b;
+  }
+  function removeBots(room) {
+    for (const q of [...room.players.values()]) if (q.isBot) removePlayer(room, q);
+  }
+
   const cleanName = (n) => String(n || 'Player').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16) || 'Player';
   const seatOf = (room, id) => room.seats.find((s) => s.id === id);
 
@@ -63,7 +79,7 @@ function createApp() {
     const players = [...room.players.values()].map((q) => {
       const seat = q.seatId ? seatOf(room, q.seatId) : null;
       return {
-        id: q.id, name: q.name, hue: q.hue, connected: q.connected,
+        id: q.id, name: q.name, hue: q.hue, connected: q.connected, isBot: !!q.isBot,
         absent: !q.connected && now - q.disconnectedAt > ABSENT_MS,
         seatId: q.seatId,
         side: g ? g.playerSide[q.id] || null : seat ? seat.side : null,
@@ -125,10 +141,11 @@ function createApp() {
       for (const id of present) { playerSide[id] = side; names[id] = room.players.get(id).name; }
     }
     room.game = new Game({
-      owner, playerSide, names,
+      owner, playerSide, names, bots: [...room.players.values()].filter((q) => q.isBot).map((q) => q.id),
       baseMs: Math.round(room.settings.minutes * 60000), incMs: Math.round(room.settings.increment * 1000), now: Date.now(),
     });
     room.phase = 'playing';
+    room.botPlan = {};
     room.chat.w = []; room.chat.b = [];
     sys(room, 'w', 'Game on. You are White.');
     sys(room, 'b', 'Game on. You are Black.');
@@ -136,6 +153,7 @@ function createApp() {
   }
 
   function shuffle(room) {
+    removeBots(room);
     for (const s of room.seats) s.playerId = null;
     const ps = [...room.players.values()].filter((q) => q.connected);
     for (const q of room.players.values()) q.seatId = null;
@@ -153,7 +171,7 @@ function createApp() {
     if (p.seatId) { const s = seatOf(room, p.seatId); if (s) s.playerId = null; }
     room.players.delete(p.id);
     if (room.hostId === p.id) {
-      const next = [...room.players.values()].find((q) => q.connected) || [...room.players.values()][0];
+      const next = humans(room).find((q) => q.connected) || humans(room)[0];
       room.hostId = next ? next.id : null;
     }
   }
@@ -192,7 +210,9 @@ function createApp() {
         if (msg.seatId) {
           const s = seatOf(room, msg.seatId);
           if (!s) return err('No such seat');
-          if (s.playerId) return err('Seat taken');
+          const occ = s.playerId && room.players.get(s.playerId);
+          if (occ && occ.isBot) removePlayer(room, occ);
+          else if (s.playerId) return err('Seat taken');
           s.playerId = p.id; p.seatId = s.id;
         }
         break;
@@ -202,9 +222,17 @@ function createApp() {
         removePlayer(room, p);
         ws.pid = null; ws.room = null;
         send(ws, { t: 'left' });
-        if (!room.players.size) { rooms.delete(room.code); return; }
+        if (!humans(room).length) { rooms.delete(room.code); return; }
         break;
       }
+      case 'fillBots':
+        if (room.phase !== 'lobby' || p.id !== room.hostId) return err('Only the host can add bots');
+        for (const seat of room.seats) if (!seat.playerId) addBot(room, seat);
+        break;
+      case 'clearBots':
+        if (room.phase !== 'lobby' || p.id !== room.hostId) return err('Only the host can remove bots');
+        removeBots(room);
+        break;
       case 'shuffle':
         if (room.phase !== 'lobby' || p.id !== room.hostId) return err('Only the host can shuffle in the lobby');
         shuffle(room);
@@ -267,6 +295,40 @@ function createApp() {
     broadcast(room);
   }
 
+  // Each bot on the side to move picks a random delay, then tries a move with its own pieces.
+  // Like a human, it can lose the race to a teammate; then it just plans again for the next turn.
+  function driveBots(room, now) {
+    const g = room.game;
+    if (g.over || g.pendingPromo) return false;
+    const turn = g.chess.turn();
+    const ply = g.log.length;
+    const due = [];
+    for (const b of room.players.values()) {
+      if (!b.isBot || g.playerSide[b.id] !== turn) continue;
+      let plan = room.botPlan[b.id];
+      if (!plan || plan.ply !== ply) {
+        if (!Object.keys(g.movableFor(b.id)).length) { room.botPlan[b.id] = { ply, at: Infinity }; continue; }
+        // hurry up when the team clock is low
+        const [lo, hi] = botDelay;
+        const cap = Math.max(200, g.clock[turn] / 6);
+        const delay = Math.min(cap, lo + Math.random() * (hi - lo));
+        plan = room.botPlan[b.id] = { ply, at: now + delay };
+      }
+      if (now >= plan.at) due.push([b, plan]);
+    }
+    // several bots can come due in the same 100ms tick: the one that planned earliest goes first
+    due.sort((x, y) => x[1].at - y[1].at);
+    for (const [b, plan] of due) {
+      plan.at = Infinity;
+      const m = chooseMove(g.chess.fen(), g.owner, b.id, { seen: new Set(g.positions) });
+      if (!m) continue;
+      const r = g.attemptMove(b.id, m.from, m.to, now);
+      if (r.ok && r.kind === 'promotion-pending') g.choosePromotion(b.id, m.promotion || 'q', now);
+      if (r.ok) return true;
+    }
+    return false;
+  }
+
   // ---- HTTP + WebSocket ----
   const server = http.createServer((req, res) => {
     let url, rel;
@@ -314,14 +376,16 @@ function createApp() {
     for (const [code, room] of rooms) {
       if (room.phase === 'playing') {
         // tick() reports flags and auto-promotions; otherwise refresh once a second to resync clocks and absent flags
-        if (room.game.tick(now) || now % 1000 < 100) broadcast(room);
+        const changed = room.game.tick(now);
+        const botMoved = !room.game.over && driveBots(room, now);
+        if (changed || botMoved || now % 1000 < 100) broadcast(room);
       }
       if (room.phase === 'lobby') {
         for (const p of [...room.players.values()]) {
-          if (!p.connected && now - p.disconnectedAt > LOBBY_PRUNE_MS) { removePlayer(room, p); broadcast(room); }
+          if (!p.isBot && !p.connected && now - p.disconnectedAt > LOBBY_PRUNE_MS) { removePlayer(room, p); broadcast(room); }
         }
       }
-      const anyone = [...room.players.values()].some((q) => q.connected);
+      const anyone = humans(room).some((q) => q.connected);
       if (anyone) room.idleSince = now;
       else if (now - room.idleSince > ROOM_IDLE_MS) rooms.delete(code);
     }

@@ -43,6 +43,14 @@ On the server: `systemctl --user status team-chess`, logs with `journalctl --use
 
 Open two or more browser tabs (or a phone plus a laptop). Each tab is its own player, and refreshing a tab rejoins the same seat. In the lobby, put one player on each side and press Start. Empty seats' pieces are shared out among the players seated on that side, so 2 players can play any variant.
 
+Or fill the empty seats with bots: the host presses **Fill empty seats with bots** in the lobby. You can even leave yourself unseated and watch a bot-only game. A human can click a bot's seat to take it over.
+
+## Bots
+
+`bot.js` is a deliberately weak player, meant to make the kind of mistakes a roughly 1200-rated player makes. It isn't calibrated against real ratings. It only considers moves of its own pieces, looks one reply ahead (every move the other side could answer with), scores with material plus simple positional tables, adds random noise, and about 8% of the time plays a random legal move. It steers away from repeating positions unless it's losing.
+
+Each bot on the side to move waits a random 2 to 9 seconds (`BOT_DELAY_MS` in `server.js`), shortened when its team clock is low, then tries its move. Bots race their teammates exactly like humans do. If a bot holds the king, any human on that side can resign or answer draw offers.
+
 ## Variants
 
 | Variant | Seats per side | Who controls what |
@@ -54,10 +62,11 @@ Open two or more browser tabs (or a phone plus a laptop). Each tab is its own pl
 ## Files
 
 - `rules.js`: all game logic (ownership, arbitration, clocks, collisions, promotion). No networking.
-- `server.js`: HTTP + WebSocket server, rooms, seats, chat.
+- `server.js`: HTTP + WebSocket server, rooms, seats, chat, and the loop that drives bots.
+- `bot.js`: the bot's move choice.
 - `public/index.html`: the whole client.
 - `test.js`: `npm test` runs the rules tests and a full websocket game.
 
 ## Not built yet
 
-Bots, the Ray Award / blame replay (needs an engine), accounts, persistence. Rooms live in memory and vanish on restart.
+Engine-strength bots, the Ray Award / blame replay (needs an engine), accounts, persistence. Rooms live in memory and vanish on restart.

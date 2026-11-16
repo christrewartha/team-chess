@@ -64,11 +64,12 @@ const COLLISION_WINDOW_MS = 3000;
 
 class Game {
   // owner: square -> playerId for every piece on the board.
-  constructor({ owner, playerSide, names, baseMs, incMs, now, fen }) {
+  constructor({ owner, playerSide, names, baseMs, incMs, now, fen, bots }) {
     this.chess = fen ? new Chess(fen) : new Chess();
     this.owner = { ...owner };
     this.playerSide = { ...playerSide };
     this.names = { ...names };
+    this.bots = new Set(bots || []);
     this.baseMs = baseMs;
     this.incMs = incMs;
     this.clock = { w: baseMs, b: baseMs };
@@ -84,7 +85,10 @@ class Game {
     this.lastMove = null;
     this.prev = null; // info about the last committed move, for collision detection
     this.events = [];
+    this.positions = [this._posKey()]; // for the bots' repetition avoidance
   }
+
+  _posKey() { return this.chess.fen().split(' ').slice(0, 4).join(' '); }
 
   name(pid) { return this.names[pid] || 'Someone'; }
 
@@ -95,6 +99,13 @@ class Game {
       }
     }
     return null;
+  }
+
+  // The king's player holds resign/draw for the team. If a bot holds the king, any human on that side can.
+  speaksForTeam(pid, side) {
+    const king = this.kingPlayer(side);
+    if (king === pid) return true;
+    return this.bots.has(king) && !this.bots.has(pid) && this.playerSide[pid] === side;
   }
 
   pieceCount(pid) {
@@ -217,6 +228,7 @@ class Game {
       t: now - this.startedAt,
     });
     this.prev = { fen: fenBefore, owner: ownerBefore, side, pid, time: now, collided: new Set() };
+    this.positions.push(this._posKey());
     this.events.push({ type: 'moved', pid, side, from: res.from, to: res.to, san: res.san, capture: !!res.captured });
     this._checkEnd();
     return { ok: true, kind: 'committed', san: res.san };
@@ -267,7 +279,7 @@ class Game {
   resign(pid) {
     if (this.over) return { ok: false, reason: 'over' };
     const side = this.playerSide[pid];
-    if (!side || this.kingPlayer(side) !== pid) return { ok: false, reason: 'not-king' };
+    if (!side || !this.speaksForTeam(pid, side)) return { ok: false, reason: 'not-king' };
     const other = side === 'w' ? 'b' : 'w';
     this._end({ type: 'resign', winner: other, text: `${SIDE_NAME[side]} resigns. ${SIDE_NAME[other]} wins` });
     return { ok: true };
@@ -276,7 +288,7 @@ class Game {
   offerDraw(pid) {
     if (this.over) return { ok: false, reason: 'over' };
     const side = this.playerSide[pid];
-    if (!side || this.kingPlayer(side) !== pid) return { ok: false, reason: 'not-king' };
+    if (!side || !this.speaksForTeam(pid, side)) return { ok: false, reason: 'not-king' };
     this.drawOffer = side;
     return { ok: true };
   }
@@ -284,7 +296,7 @@ class Game {
   respondDraw(pid, accept) {
     if (this.over || !this.drawOffer) return { ok: false, reason: 'no-offer' };
     const side = this.playerSide[pid];
-    if (!side || side === this.drawOffer || this.kingPlayer(side) !== pid) return { ok: false, reason: 'not-king' };
+    if (!side || side === this.drawOffer || !this.speaksForTeam(pid, side)) return { ok: false, reason: 'not-king' };
     if (accept) this._end({ type: 'agreement', winner: null, text: 'Draw by agreement' });
     else this.drawOffer = null;
     return { ok: true };
@@ -334,6 +346,7 @@ class Game {
       pendingPromo: this.pendingPromo,
       drawOffer: this.drawOffer,
       kingPlayer: { w: this.kingPlayer('w'), b: this.kingPlayer('b') },
+      speaksForTeam: !!this.playerSide[viewerId] && this.speaksForTeam(viewerId, this.playerSide[viewerId]),
       playerSide: this.playerSide,
       youSide: this.playerSide[viewerId] || null,
       result: this.result,

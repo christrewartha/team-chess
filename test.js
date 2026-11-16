@@ -3,6 +3,8 @@ const assert = require('assert');
 const WebSocket = require('ws');
 const { Game, buildSeats, VARIANTS } = require('./rules');
 const { createApp } = require('./server');
+const { chooseMove } = require('./bot');
+const { Chess } = require('chess.js');
 
 let passed = 0;
 const tests = [];
@@ -183,6 +185,37 @@ test('check locks out players who cannot resolve it', () => {
   assert.deepStrictEqual(g.moverSquares(), ['e1']);
 });
 
+// ---- bots ----
+const ownAll = (fen, pid) => { const o = {}; for (const r of new Chess(fen).board()) for (const p of r) if (p) o[p.square] = pid; return o; };
+
+test('bot takes free material and finds mate in one', () => {
+  let fen = '4k3/8/8/3q4/8/8/8/3QK3 w - - 0 1';
+  assert.strictEqual(chooseMove(fen, ownAll(fen, 'X'), 'X', { blunderRate: 0 }).san, 'Qxd5');
+  fen = '6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1';
+  assert.strictEqual(chooseMove(fen, ownAll(fen, 'X'), 'X', { blunderRate: 0 }).san, 'Ra8#');
+});
+
+test('bot only moves its own pieces, and passes when it has none that can move', () => {
+  const fen = new Chess().fen();
+  const owner = { ...ownAll(fen, 'Y') };
+  owner.g1 = 'X'; // X owns only the g1 knight
+  for (let i = 0; i < 20; i++) assert.strictEqual(chooseMove(fen, owner, 'X').from, 'g1');
+  owner.g1 = 'Y'; owner.a1 = 'X'; // a boxed-in rook has no moves
+  assert.strictEqual(chooseMove(fen, owner, 'X'), null);
+});
+
+test('a human can resign or answer draws when a bot holds the king', () => {
+  const g = game({ owner: ownAll(new Chess().fen(), 'C'), playerSide: { A: 'w', BOT: 'w', C: 'b' }, bots: ['BOT'] });
+  for (const sq of ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1', 'a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2']) g.owner[sq] = sq === 'a2' ? 'A' : 'BOT';
+  assert.strictEqual(g.kingPlayer('w'), 'BOT');
+  assert(g.speaksForTeam('A', 'w'));
+  assert(!g.speaksForTeam('C', 'w'));
+  assert(g.offerDraw('C').ok);
+  assert(g.respondDraw('A', false).ok);
+  assert(g.resign('A').ok);
+  assert.strictEqual(g.result.winner, 'b');
+});
+
 // ---- full websocket flow ----
 function client(url) {
   const ws = new WebSocket(url);
@@ -286,6 +319,70 @@ test('websocket game: lobby, seats, start, moves, attribution, chat, resign', as
     throw e;
   }
   app.close();
+});
+
+test('websocket: fill with bots, bots answer a human, and a human can take a bot seat', async () => {
+  const app = createApp({ botDelayMs: [5, 30] });
+  await new Promise((r) => app.server.listen(0, r));
+  const url = 'ws://127.0.0.1:' + app.server.address().port;
+  try {
+    const a = client(url);
+    await a.ready;
+    a.send({ t: 'create', name: 'Ann', token: 'ta', variant: '4v4' });
+    await a.until((c) => c.state && c.joined);
+    a.send({ t: 'seat', seatId: 'w-c3' }); // king + bishop
+    a.send({ t: 'fillBots' });
+    await a.until((c) => c.state.seats.every((s) => s.playerId));
+    assert.strictEqual(a.state.players.filter((p) => p.isBot).length, 7);
+
+    // a second human takes a bot's seat; the bot goes away
+    const b = client(url);
+    await b.ready;
+    b.send({ t: 'join', room: a.joined.room, name: 'Bob', token: 'tb' });
+    await b.until((c) => c.state && c.state.players.length === 9);
+    b.send({ t: 'seat', seatId: 'b-c1' });
+    await a.until((c) => {
+      const bob = c.state.players.find((p) => p.name === 'Bob');
+      return c.state.players.length === 8 && bob && c.state.seats.find((s) => s.id === 'b-c1').playerId === bob.id;
+    });
+
+    a.send({ t: 'start' });
+    await a.until((c) => c.state.phase === 'playing');
+    // white bots race Ann for the first move; wait for several plies of bots and humans
+    await a.until((c) => c.state.game.log.length >= 1, 3000);
+    const firstMover = a.state.game.log[0].name;
+    assert(firstMover !== 'Bob');
+    // black bots answer
+    await a.until((c) => c.state.game.log.length >= 4 || c.state.phase === 'over', 5000);
+    for (const m of a.state.game.log) {
+      const p = a.state.players.find((q) => q.id === m.pid);
+      assert(p, 'mover is a known player');
+    }
+  } finally {
+    app.close();
+  }
+});
+
+test('websocket: an all-bot game plays itself while the host watches', async () => {
+  const app = createApp({ botDelayMs: [1, 5] });
+  await new Promise((r) => app.server.listen(0, r));
+  const url = 'ws://127.0.0.1:' + app.server.address().port;
+  try {
+    const a = client(url);
+    await a.ready;
+    a.send({ t: 'create', name: 'Ann', token: 'ta', variant: '16v16' });
+    await a.until((c) => c.state && c.joined);
+    a.send({ t: 'fillBots' });
+    await a.until((c) => c.state.seats.every((s) => s.playerId));
+    assert.strictEqual(a.state.players.filter((p) => p.isBot).length, 32);
+    assert.strictEqual(new Set(a.state.players.map((p) => p.name)).size, 33, 'bot names are unique');
+    a.send({ t: 'start' });
+    await a.until((c) => c.state.phase === 'playing');
+    await a.until((c) => c.state.game.log.length >= 10 || c.state.phase === 'over', 8000);
+    assert.strictEqual(a.state.hostId, a.state.you);
+  } finally {
+    app.close();
+  }
 });
 
 (async () => {
