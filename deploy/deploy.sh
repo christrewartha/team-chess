@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Runs on your dev machine (Git Bash is fine). Deploys whatever is pushed to GitHub to the server.
-#   deploy/deploy.sh            # deploy to chris@scaramanga
+#   deploy/deploy.sh            # deploy to chris@scaramanga.local
 #   deploy/deploy.sh --force    # restart even if a game is in progress
-# Env overrides: DEPLOY_HOST (default chris@scaramanga), TEAM_CHESS_PORT (default 3000)
+# Env overrides: DEPLOY_HOST (default chris@scaramanga.local), TEAM_CHESS_PORT (default 3000)
 set -euo pipefail
 
-HOST="${DEPLOY_HOST:-chris@scaramanga}"
+HOST="${DEPLOY_HOST:-chris@scaramanga.local}"
 REPO="https://github.com/christrewartha/team-chess.git"
 PORT="${TEAM_CHESS_PORT:-3000}"
 FORCE=0

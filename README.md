@@ -23,8 +23,10 @@ Needs on the server: Node 18+, git, curl, and SSH access from your dev machine (
 git push
 deploy/deploy.sh             # clone or pull on the server, npm ci, restart, health check
 deploy/deploy.sh --force     # restart even if a game is in progress
-DEPLOY_HOST=chris@192.168.0.50 deploy/deploy.sh   # if the name doesn't resolve
+DEPLOY_HOST=chris@192.168.0.97 deploy/deploy.sh   # if scaramanga.local doesn't resolve
 ```
+
+The script uses `scaramanga.local` (mDNS), not plain `scaramanga`: on the work PC the bare name gets the `epicgames.net` suffix and reaches a different machine.
 
 The first run clones to `~/team-chess` and asks for your sudo password once, to enable lingering so the service runs without you logged in and starts at boot. The deploy refuses to restart while a game is being played, because rooms live in memory and a restart ends them.
 
