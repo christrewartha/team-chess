@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node test.js",
-    "deploy": "bash deploy/deploy.sh"
+    "deploy": "node deploy/run.js"
   },
   "dependencies": {
     "chess.js": "^1.0.0",
