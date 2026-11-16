@@ -1,0 +1,14 @@
+{
+  "name": "chess-16v16",
+  "version": "0.1.0",
+  "description": "16v16 team chess: one piece per player, first legal move wins the turn",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "chess.js": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}
