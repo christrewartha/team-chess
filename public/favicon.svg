@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64 64">
+  <defs>
+    <g id="pawn">
+      <circle cx="0" cy="-31" r="7"/>
+      <rect x="-8" y="-24.5" width="16" height="3.5" rx="1.75"/>
+      <path d="M-5,-21 L5,-21 Q6,-12 11,-6 L-11,-6 Q-6,-12 -5,-21Z"/>
+      <rect x="-14" y="-7" width="28" height="7" rx="2.5"/>
+    </g>
+    <clipPath id="r"><rect width="64" height="64" rx="14"/></clipPath>
+  </defs>
+  <g clip-path="url(#r)">
+    <rect width="64" height="64" fill="#1b1e27"/>
+    <path d="M0 0h16v16H0zM32 0h16v16H32zM16 16h16v16H16zM48 16h16v16H48zM0 32h16v16H0zM32 32h16v16H32zM16 48h16v16H16zM48 48h16v16H48z" fill="#232734"/>
+  </g>
+  <use xlink:href="#pawn" href="#pawn" transform="translate(15 50) scale(.62)" fill="#7a869f"/>
+  <use xlink:href="#pawn" href="#pawn" transform="translate(49 50) scale(.62)" fill="#7a869f"/>
+  <use xlink:href="#pawn" href="#pawn" transform="translate(32 57)" fill="#ffb020" stroke="#1b1e27" stroke-width="2.5" paint-order="stroke"/>
+</svg>
